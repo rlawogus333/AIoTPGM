@@ -103,5 +103,3 @@ opencv-python
 tensorflow
 keras
 tqdm
-
-### License
