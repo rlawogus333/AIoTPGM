@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI 가위바위보 음성 측정기</title>
+  <style>
+    body {
+      font-family: 'Pretendard', -apple-system, sans-serif;
+      background-color: #f0f2f5;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      margin: 0;
+    }
+    .container {
+      background: white;
+      padding: 2rem;
+      border-radius: 20px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+      text-align: center;
+      width: 90%;
+      max-width: 400px;
+    }
+    h2 { color: #333; margin-bottom: 1.5rem; font-weight: 700; }
+    #webcam-container {
+      margin: 0 auto;
+      border-radius: 15px;
+      overflow: hidden;
+      border: 4px solid #e0e0e0;
+      background: #000;
+      width: 200px;
+      height: 200px;
+    }
+    button {
+      background: #4a90e2;
+      color: white;
+      border: none;
+      padding: 12px 30px;
+      font-size: 1rem;
+      border-radius: 10px;
+      cursor: pointer;
+      margin-top: 1.5rem;
+      transition: all 0.3s ease;
+      font-weight: bold;
+    }
+    button:hover { background: #357abd; transform: translateY(-2px); }
+    #label-container {
+      margin-top: 20px;
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: #4a90e2;
+      min-height: 2rem;
+    }
+    .status-text { font-size: 0.9rem; color: #888; margin-top: 10px; }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <h2>AI 모션 인식 (음성)</h2>
+    <div id="webcam-container"></div>
+    <div id="label-container">준비중...</div>
+    <button type="button" onclick="init()">AI 카메라 시작</button>
+    <p class="status-text">카메라가 켜지면 손을 보여주세요.</p>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@latest/dist/tf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@teachablemachine/image@latest/dist/teachablemachine-image.min.js"></script>
+<script type="text/javascript">
+    const URL = "./my_model/";
+    let model, webcam, labelContainer, maxPredictions;
+    
+    // 이전에 무엇을 말했는지 저장하는 변수 (중복 음성 방지)
+    let lastSpoken = "";
+
+    async function init() {
+        const modelURL = URL + "model.json";
+        const metadataURL = URL + "metadata.json";
+
+        document.getElementById("label-container").innerHTML = "모델 로딩 중...";
+
+        model = await tmImage.load(modelURL, metadataURL);
+        maxPredictions = model.getTotalClasses();
+
+        const flip = true; 
+        webcam = new tmImage.Webcam(200, 200, flip);
+        await webcam.setup();
+        await webcam.play();
+        window.requestAnimationFrame(loop);
+
+        document.getElementById("webcam-container").appendChild(webcam.canvas);
+        labelContainer = document.getElementById("label-container");
+    }
+
+    async function loop() {
+        webcam.update();
+        await predict();
+        window.requestAnimationFrame(loop);
+    }
+
+    // --- 음성 출력 함수 추가 ---
+    function speak(text) {
+        // 이미 같은 말을 하고 있다면 중단 (중복 방지)
+        if (lastSpoken === text) return;
+        
+        // 이전 음성이 재생 중이면 멈추기 (선택 사항)
+        window.speechSynthesis.cancel();
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'ko-KR'; // 한국어 설정
+        utterance.rate = 1.0;     // 속도
+        window.speechSynthesis.speak(utterance);
+        
+        lastSpoken = text; // 마지막으로 한 말을 기록
+    }
+
+    async function predict() {
+        const prediction = await model.predict(webcam.canvas);
+        
+        if (prediction[0].probability >= 0.85){
+            labelContainer.innerHTML = "✊ 주먹!";
+            speak("주먹");
+        }
+        else if(prediction[1].probability >= 0.85){
+            labelContainer.innerHTML = "🖐️ 보자기!";
+            speak("보자기");
+        }
+        else {
+            labelContainer.innerHTML = "🤔 인식 중...";
+            lastSpoken = ""; // 아무것도 인식 안 될 때 초기화하여 다시 인식 시 말하게 함
+        }
+    }
+</script>
+</body>
+</html>
